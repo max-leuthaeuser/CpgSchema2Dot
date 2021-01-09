@@ -4,6 +4,8 @@ Prints our codepropertygraph schema via dot as SVG.
 
 # Installation
 
+Have `dot` available on the command-line (you may need to install `graphviz`).
+
 You can build `CpgSchema2Dot` by running the command below.
 
 ``` bash
