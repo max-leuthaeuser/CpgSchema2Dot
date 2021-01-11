@@ -213,7 +213,7 @@ object CpgSchema2Dot {
     } else {
       generateOutput(config,
                      config.jsonFile.nameWithoutExtension,
-                     candidates.flatMap(c => c._1 +: c._2))
+                     candidates.flatMap(c => c._1 +: c._2).distinct)
     }
 
   }
