@@ -12,6 +12,17 @@ object CpgSchema2Dot {
 
   implicit val formats: DefaultFormats.type = DefaultFormats
 
+  private case class NodeKey(name: String, valueType: String = "", cardinality: String = "") {
+    override def toString: String =
+      if (valueType.isEmpty) {
+        s"$name $cardinality"
+      } else if (cardinality.isEmpty) {
+        s"$name: $valueType"
+      } else {
+        s"$name: $valueType $cardinality"
+      }
+  }
+
   private case class Node(name: String, keys: List[String], is: List[String], outEdges: List[Edge])
 
   private case class Edge(label: String, inNodes: List[String])
@@ -22,42 +33,75 @@ object CpgSchema2Dot {
   private def jsonFromString(content: String): JValue =
     parse(content)
 
-  private def nodeTypes(json: JValue): JValue =
+  private def nodeKeysRaw(json: JValue): JValue =
+    json \ "nodeKeys"
+
+  private def nodeTypesRaw(json: JValue): JValue =
     json \ "nodeTypes"
 
-  private def nodeBaseTrait(json: JValue): JValue =
+  private def nodeBaseTraitRaw(json: JValue): JValue =
     json \ "nodeBaseTraits"
 
-  private def nodes(json: JValue): List[Node] = {
-    val allNodeTypes = nodeTypes(json)
-    allNodeTypes.children.map { jValue =>
-      val name     = (jValue \ "name").extract[String]
-      val keys     = (jValue \ "keys").extract[List[String]]
-      val is       = (jValue \ "is").extract[List[String]]
-      val outEdges = jValue \ "outEdges"
-      val edges = for {
-        JObject(edge)                      <- outEdges
-        JField("edgeName", JString(label)) <- edge
-        JField("inNodes", JArray(list))    <- edge
-      } yield {
-        val l = list.map { n =>
-          val cardinality = (n \ "cardinality").extract[Option[String]] match {
-            case Some(value) => s"($value)"
-            case None        => ""
-          }
-          val name       = (n \ "name").extract[String]
-          val finalLabel = s"$label $cardinality"
-          Edge(finalLabel, List(name))
+  private def mapCardinality(cardinality: String): String = cardinality match {
+    case "one"       => "(1)"
+    case "list"      => "(0:n)"
+    case "zeroOrOne" => "(0:1)"
+  }
+
+  private def toNode(config: Config, json: JValue, nodeKeys: List[NodeKey]): Node = {
+    val name = (json \ "name").extract[String]
+    val keys =
+      if (config.noNodeKeys) Nil
+      else
+        (json \ "keys")
+          .extract[List[String]]
+          .map(k => nodeKeys.find(_.name == k).getOrElse(NodeKey(name = k)).toString)
+    val is       = (json \ "is").extract[List[String]]
+    val outEdges = json \ "outEdges"
+    val edges = for {
+      JObject(edge)                      <- outEdges
+      JField("edgeName", JString(label)) <- edge
+      JField("inNodes", JArray(list))    <- edge
+    } yield {
+      val l = list.map { n =>
+        val cardinality = (n \ "cardinality").extract[Option[String]] match {
+          case Some(value) => s"($value)"
+          case None        => ""
         }
-        l
+        val name       = (n \ "name").extract[String]
+        val finalLabel = s"$label $cardinality"
+        Edge(finalLabel, List(name))
       }
-      Node(name, keys, is, edges.flatten)
-    } ++ nodeBaseTrait(json).children.map { n =>
-      val name = (n \ "name").extract[String]
-      val keys = (n \ "hasKeys").extract[List[String]]
-      val is   = (n \ "extends").extract[List[String]]
-      Node(name, keys, is, List.empty)
+      l
     }
+    Node(name, keys, is, edges.flatten)
+  }
+
+  private def toNodeBase(config: Config, json: JValue, nodeKeys: List[NodeKey]): Node = {
+    val name = (json \ "name").extract[String]
+    val keys =
+      if (config.noNodeKeys) Nil
+      else
+        (json \ "hasKeys")
+          .extract[List[String]]
+          .map(k => nodeKeys.find(_.name == k).getOrElse(NodeKey(name = k)).toString)
+    val is = (json \ "extends").extract[List[String]]
+    Node(name, keys, is, List.empty)
+  }
+
+  private def toNodeKey(json: JValue): NodeKey = {
+    val name        = (json \ "name").extract[String]
+    val valueType   = (json \ "valueType").extract[String]
+    val cardinality = (json \ "cardinality").extract[String]
+    NodeKey(name, valueType, mapCardinality(cardinality))
+  }
+
+  private def nodes(config: Config, json: JValue): List[Node] = {
+    val allNodeTypes = nodeTypesRaw(json)
+    val allNodeKeys  = nodeKeysRaw(json).children.map(toNodeKey)
+
+    allNodeTypes.children.map(n => toNode(config, n, allNodeKeys)) ++
+      nodeBaseTraitRaw(json).children.map(n => toNodeBase(config, n, allNodeKeys))
   }
 
   private def namedGraphBegin(): StringBuilder = {
@@ -97,11 +141,13 @@ object CpgSchema2Dot {
   }
 
   private def dotGraph(nodes: List[Node]): String = {
-    val sb          = namedGraphBegin()
+    val sb = namedGraphBegin()
+
     val nodeStrings = nodes.map(nodeToDot)
     val edgeStrings = nodes.flatMap(n => n.outEdges.map(e => edgeToDot(n.name, e)))
     val isString    = nodes.map(isToDot)
     sb.append((nodeStrings ++ edgeStrings ++ isString).mkString("\n"))
+
     graphEnd(sb)
   }
 
@@ -130,6 +176,7 @@ object CpgSchema2Dot {
     if (outSvgFile.exists) outSvgFile.delete()
     outDotFile.write(dotGraph(nodes))
     createSvgFile(outDotFile, outSvgFile)
+    println(s"Saved '$outSvgFile' successfully.")
   }
 
   private def run(config: Config): Unit = {
@@ -138,7 +185,7 @@ object CpgSchema2Dot {
 
     config.outDir.createDirectoryIfNotExists()
 
-    val allNodes = nodes(json)
+    val allNodes = nodes(config, json)
 
     val filterList = config.selectedNodes match {
       case seq if seq.nonEmpty => seq
@@ -147,22 +194,26 @@ object CpgSchema2Dot {
 
     val candidates = allNodes
       .filter(n => filterList.contains(n.name))
-      .flatMap { node =>
-        val dependentNodes = if (config.resolve) {
-          allNodes.filter { n =>
+      .map { node =>
+        val dependentNodes = allNodes
+          .filter { n =>
             val resNodes = node.outEdges.flatMap(_.inNodes)
             val isNodes  = node.is
             resNodes.contains(n.name) || isNodes.contains(n.name)
           }
-        } else Nil
-        node +: dependentNodes
+          .map { n =>
+            if (config.resolve) n
+            else n.copy(is = List.empty, outEdges = List.empty)
+          }
+        node -> dependentNodes
       }
-      .distinct
 
     if (config.saveIndividually) {
-      candidates.foreach(c => generateOutput(config, c.name, List(c)))
+      candidates.foreach { case (k, v) => generateOutput(config, k.name, k +: v) }
     } else {
-      generateOutput(config, config.jsonFile.nameWithoutExtension, candidates)
+      generateOutput(config,
+                     config.jsonFile.nameWithoutExtension,
+                     candidates.flatMap(c => c._1 +: c._2))
     }
 
   }

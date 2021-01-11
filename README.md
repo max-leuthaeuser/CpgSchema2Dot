@@ -35,6 +35,8 @@ Usage: CpgSchema2Dot [options] <path-to-json>
         enables resolving attributes and edges for all direct neighbours of the selected nodes
   --save-individually
         generate individual files for each selected node (see selected-nodes)
+  --no-nodekeys
+        disables printing of node keys
 ```
 
 `CpgSchema2Dot` requires at least one argument `<path-to-json>`. This is the path

@@ -10,6 +10,7 @@ object ArgumentsParser {
   val OUT_DIR: String           = "out-dir"
   val RESOLVE: String           = "resolve"
   val SAVE_INDIVIDUALLY: String = "save-individually"
+  val NO_NODE_KEYS: String      = "no-nodekeys"
 }
 
 class ArgumentsParser {
@@ -47,6 +48,9 @@ class ArgumentsParser {
     opt[Unit](SAVE_INDIVIDUALLY)
       .text(s"generate individual files for each selected node (see $SELECTED_NODES)")
       .action((_, c) => c.copy(saveIndividually = true))
+    opt[Unit](NO_NODE_KEYS)
+      .text(s"disables printing of node keys")
+      .action((_, c) => c.copy(noNodeKeys = true))
   }
 
   def parse(args: Array[String]): Option[Config] =
