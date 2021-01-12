@@ -7,9 +7,9 @@ version := "0.1"
 scalaVersion := "2.13.4"
 
 libraryDependencies ++= Seq(
-  "org.json4s"           %% "json4s-native" % "3.6.7",
+  "org.json4s"           %% "json4s-native" % "3.6.10",
   "com.github.pathikrit" %% "better-files"  % "3.9.1",
-  "com.github.scopt"     %% "scopt"         % "3.7.1"
+  "com.github.scopt"     %% "scopt"         % "4.0.0"
 )
 
 scalacOptions ++= Seq(

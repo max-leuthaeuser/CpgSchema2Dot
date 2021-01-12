@@ -56,6 +56,6 @@ class ArgumentsParser {
   def parse(args: Array[String]): Option[Config] =
     parser.parse(args, Config())
 
-  def showUsage(): Unit = println(parser.renderOneColumnUsage)
+  def showUsage(): Unit = println(parser.usage)
 
 }
