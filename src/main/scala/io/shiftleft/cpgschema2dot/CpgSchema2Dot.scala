@@ -179,6 +179,21 @@ object CpgSchema2Dot {
     println(s"Saved '$outSvgFile' successfully.")
   }
 
+  private def nodesInDir(dir: String, allNodes: List[Node], node: Node): List[Node] = dir match {
+    case "IN" =>
+      allNodes.filter { n =>
+        val resNodes = n.outEdges.flatMap(_.inNodes)
+        val isNodes  = n.is
+        resNodes.contains(node.name) || isNodes.contains(node.name)
+      }
+    case "OUT" =>
+      allNodes.filter { n =>
+        val resNodes = node.outEdges.flatMap(_.inNodes)
+        val isNodes  = node.is
+        resNodes.contains(n.name) || isNodes.contains(n.name)
+      }
+  }
+
   private def run(config: Config): Unit = {
     val jsonContent = loadFromFile(config.jsonFile)
     val json        = jsonFromString(jsonContent)
@@ -194,18 +209,23 @@ object CpgSchema2Dot {
 
     val candidates = allNodes
       .filter(n => filterList.contains(n.name))
-      .map { node =>
-        val dependentNodes = allNodes
-          .filter { n =>
-            val resNodes = node.outEdges.flatMap(_.inNodes)
-            val isNodes  = node.is
-            resNodes.contains(n.name) || isNodes.contains(n.name)
+      .map {
+        case node if config.resolve =>
+          val inNodes = nodesInDir("IN", allNodes, node).map { n =>
+            n.copy(outEdges = n.outEdges.filter(e => e.inNodes.contains(node.name)))
           }
-          .map { n =>
-            if (config.resolve) n
-            else n.copy(is = List.empty, outEdges = List.empty)
-          }
-        node -> dependentNodes
+          val outNodes       = nodesInDir("OUT", allNodes, node)
+          val dependentNodes = outNodes.map(_.copy(is = List.empty, outEdges = List.empty)) ++ inNodes
+          val remainingNodes = allNodes
+            .filter { n =>
+              val l = dependentNodes.flatMap(n => n.outEdges.flatMap(_.inNodes) ++ n.is)
+              node.name != n.name && !dependentNodes.exists(_.name == n.name) && l.contains(n.name)
+            }
+            .map(_.copy(is = List.empty, outEdges = List.empty))
+          node -> (dependentNodes ++ remainingNodes)
+        case node =>
+          val outNodes = nodesInDir("OUT", allNodes, node)
+          node -> outNodes.map(_.copy(is = List.empty, outEdges = List.empty))
       }
 
     if (config.saveIndividually) {
