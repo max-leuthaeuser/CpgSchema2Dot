@@ -7,6 +7,7 @@ object ArgumentsParser {
   val HELP: String              = "help"
   val PATH_TO_JSON: String      = "<path-to-json>"
   val SELECTED_NODES: String    = "selected-nodes"
+  val SELECTED_EDGES: String    = "selected-edges"
   val OUT_DIR: String           = "out-dir"
   val RESOLVE: String           = "resolve"
   val SAVE_INDIVIDUALLY: String = "save-individually"
@@ -30,8 +31,12 @@ class ArgumentsParser {
       })
     opt[Seq[String]](SELECTED_NODES)
       .valueName("<node name 1>,<node name 2>,...,<node name n>")
-      .action((x, c) => c.copy(selectedNodes = x))
+      .action((x, c) => c.copy(selectedNodes = x.toList))
       .text("node names to select for .dot generation; will use all kind of nodes if empty")
+    opt[Seq[String]](SELECTED_EDGES)
+      .valueName("<edge name 1>,<edge name 2>,...,<edge name n>")
+      .action((x, c) => c.copy(selectedEdges = x.toList))
+      .text("edge names to select for .dot generation; will use all kind of edges if empty")
     opt[String](OUT_DIR)
       .text(s"output directory (defaults to `${Config.DEFAULT_OUT_DIR}`)")
       .action((x, c) => c.copy(outDir = File(x)))

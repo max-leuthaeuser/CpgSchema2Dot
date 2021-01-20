@@ -13,7 +13,19 @@ object Config {
 
 case class Config(jsonFile: File = File(DEFAULT_BASE_JSON),
                   outDir: File = File(DEFAULT_OUT_DIR),
-                  selectedNodes: Seq[String] = Seq.empty,
+                  selectedNodes: List[String] = List.empty,
+                  selectedEdges: List[String] = List.empty,
                   saveIndividually: Boolean = DEFAULT_SAVE_INDIVIDUALLY,
                   resolve: Boolean = DEFAULT_RESOLVE,
-                  noNodeKeys: Boolean = DEFAULT_NO_NODE_KEYS)
+                  noNodeKeys: Boolean = DEFAULT_NO_NODE_KEYS) {
+  override def toString: String = s"""
+       |Current configuration:
+       |\t-Input json file: $jsonFile
+       |\t-Output directory: $outDir
+       |\t-Selected node types: ${selectedNodes.mkString(", ")}
+       |\t-Selected edge types: ${selectedEdges.mkString(", ")}
+       |\t-Save individual images: $saveIndividually
+       |\t-Resolve all direct neighbours: $resolve
+       |\t-Draw node keys: ${!noNodeKeys}
+       |""".stripMargin
+}

@@ -23,20 +23,16 @@ Try --help for more information.
 
 Usage: CpgSchema2Dot [options] <path-to-json>
 
-  --help
-        prints this usage text
-  <path-to-json>
-        path to the json input file
+  --help                   prints this usage text
+  <path-to-json>           path to the json input file
   --selected-nodes <node name 1>,<node name 2>,...,<node name n>
-        node names to select for .dot generation; will use all kind of nodes if empty
-  --out-dir <value>
-        output directory (defaults to `out`)
-  --resolve
-        enables resolving attributes and edges for all direct neighbours of the selected nodes
-  --save-individually
-        generate individual files for each selected node (see selected-nodes)
-  --no-nodekeys
-        disables printing of node keys
+                           node names to select for .dot generation; will use all kind of nodes if empty
+  --selected-edges <edge name 1>,<edge name 2>,...,<edge name n>
+                           edge names to select for .dot generation; will use all kind of edges if empty
+  --out-dir <value>        output directory (defaults to `out`)
+  --resolve                enables resolving attributes and edges for all direct neighbours of the selected nodes
+  --save-individually      generate individual files for each selected node (see selected-nodes)
+  --no-nodekeys            disables printing of node keys
 ```
 
 `CpgSchema2Dot` requires at least one argument `<path-to-json>`. This is the path
