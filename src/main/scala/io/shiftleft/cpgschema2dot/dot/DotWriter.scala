@@ -6,6 +6,7 @@ import io.shiftleft.cpgschema2dot.graph.Node
 import io.shiftleft.cpgschema2dot.Config
 
 import scala.sys.process.Process
+import scala.util.chaining._
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
@@ -19,8 +20,12 @@ class DotWriter(private val config: Config) {
     if (outDotFile.exists) outDotFile.delete()
     if (outSvgFile.exists) outSvgFile.delete()
     outDotFile.write(dotGraph(nodes, edgeFilterList))
-    createSvgFile(outDotFile, outSvgFile)
-    println(s"Saved '$outSvgFile' successfully.")
+    createSvgFile(outDotFile, outSvgFile) match {
+      case Failure(_) =>
+        println(s"Saving '$outSvgFile' failed.")
+      case Success(_) =>
+        println(s"Saved '$outSvgFile' successfully.")
+    }
   }
 
   private def dotGraph(nodes: List[Node], edgeFilterList: List[String]): String = {
@@ -61,31 +66,28 @@ class DotWriter(private val config: Config) {
       case c  => s" $c"
     }
     val color = edgeLabel match {
-      case l if l == "AST" => "red"
-      case l if l == "CFG" => "blue"
-      case l if l == "is"  => "gray, arrowhead = empty"
-      case _               => "black"
+      case "AST" => "red"
+      case "CFG" => "blue"
+      case "is"  => "gray, arrowhead = empty"
+      case _     => "black"
     }
     val labelStr = s""" [ xlabel = "$edgeLabel$card", fontsize=8, color=$color ]"""
     edge.inNodes.map(n => s""""$from" -> "$n"""" + labelStr).mkString("\n")
   }
 
-  private def createSvgFile(in: File, out: File): Try[String] = {
-    Try {
+  private def createSvgFile(in: File, out: File): Try[String] =
+    Try(
       Process(
         Seq("dot",
             "-Gsplines=ortho",
             "-Tsvg",
             in.path.toAbsolutePath.toString,
             "-o",
-            out.path.toAbsolutePath.toString)).!!
-    } match {
-      case Success(v) => Success(v)
-      case Failure(exc) =>
-        System.err.println("Executing `dot` failed: is `graphviz` installed?")
-        System.err.println(exc)
-        Failure(exc)
-    }
-  }
+            out.path.toAbsolutePath.toString)
+      ).!!
+    ).tap(_.failed.foreach { err =>
+      System.err.println("Executing `dot` failed: is `graphviz` installed?")
+      System.err.println(err)
+    })
 
 }
